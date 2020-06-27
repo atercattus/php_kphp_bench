@@ -1,4 +1,12 @@
 <?php
+#ifndef KittenPHP
+define('kphp', 0);
+if (0) {
+#endif
+  define('kphp', 1);
+#ifndef KittenPHP
+}
+#endif
 
 function hallo() {
 }
@@ -39,8 +47,16 @@ class Foo {
     }
 
     static function isset_static($n) {
-        for ($i = 0; $i < $n; ++$i) {
-            $x = isset(self::$a);
+        if (kphp === 1) {
+            for ($i = 0; $i < $n; ++$i) {
+                $x = self::$a === 0; // access to field
+            }
+        } else {
+#ifndef KittenPHP
+            for ($i = 0; $i < $n; ++$i) {
+                $x = isset(self::$a);
+            }
+#endif
         }
     }
 
@@ -124,7 +140,7 @@ class Foo {
 
     function read_const($n) {
         for ($i = 0; $i < $n; ++$i) {
-            $x = $this::TEST;
+            $x = static::TEST; // $this::TEST doesn't compile in KPHP
         }
     }
 
@@ -143,8 +159,16 @@ function write_static($n) {
 }
 
 function isset_static($n) {
-    for ($i = 0; $i < $n; ++$i) {
-        $x = isset(Foo::$a);
+    if (kphp === 1) {
+        for ($i = 0; $i < $n; ++$i) {
+            $x = Foo::$a === 0; // access to field
+        }
+    } else {
+#ifndef KittenPHP
+        for ($i = 0; $i < $n; ++$i) {
+            $x = isset(Foo::$a);
+        }
+#endif
     }
 }
 
@@ -183,8 +207,10 @@ function read_auto_global($n) {
 $g_var = 0;
 
 function read_global_var($n) {
+    // $GLOBALS doesn't exist in KPHP
+    global $g_var;
     for ($i = 0; $i < $n; ++$i) {
-        $x = $GLOBALS['g_var'];
+        $x = $g_var;
     }
 }
 
@@ -225,7 +251,7 @@ function ternary($n) {
 }
 
 function ternary2($n) {
-    $f = false; $j = 0;
+    $f = 0; $j = 0; // "$f = false" breaks type inference for KPHP
     for ($i = 0; $i < $n; ++$i) {
         $x = $f ? $f : $j + 1;
     }
@@ -240,8 +266,14 @@ function empty_loop($n) {
 
 function gethrtime()
 {
-  $hrtime = hrtime();
-  return (($hrtime[0]*1000000000 + $hrtime[1]) / 1000000000);
+#ifndef KittenPHP
+    if (!function_exists('hrtime')) { // PHP7.2
+        return (float)microtime(true);
+    }
+    $hrtime = hrtime();
+    return (($hrtime[0]*1000000000 + $hrtime[1]) / 1000000000);
+#endif
+   return (float)microtime(true);
 }
 
 function start_test()
@@ -280,7 +312,7 @@ function total()
   echo "Total".$pad.$num."\n";
 }
 
-const N = 5000000;
+const N = 50*1000*1000; // 5kk is too small for KPHP
 
 $t0 = $t = start_test();
 empty_loop(N);
@@ -355,4 +387,5 @@ ternary(N);
 $t = end_test($t, '$x = $f ? $f : $a', $overhead);
 ternary2(N);
 $t = end_test($t, '$x = $f ? $f : tmp', $overhead);
-total($t0, "Total");
+printf("overhead %.8f\n", $overhead); // show empty loop difference
+total();//$t0, "Total"); // total has no params
